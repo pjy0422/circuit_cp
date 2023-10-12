@@ -66,7 +66,7 @@ def node_pairs_among(nodes, max_cap=-1):
 
 
 def get_pin_density(shape, bin_x, bin_y, xdata, ydata, edge) -> np.ndarray:
-    pin_density = np.zeros(shape, dtype=np.float)
+    pin_density = np.zeros(shape, dtype=np.float64)
     for i, (_, list_node_feats) in tqdm.tqdm(enumerate(edge.items()), total=len(edge.keys())):
         for node, pin_px, pin_py, _ in list_node_feats:
             px, py = xdata[node], ydata[node]
@@ -77,7 +77,7 @@ def get_pin_density(shape, bin_x, bin_y, xdata, ydata, edge) -> np.ndarray:
 
 
 def get_node_density(shape, bin_x, bin_y, xdata, ydata) -> np.ndarray:
-    node_density = np.zeros(shape, dtype=np.float)
+    node_density = np.zeros(shape, dtype=np.float64)
     for x, y in zip(xdata, ydata):
         if x < 1e-5 and y < 1e-5:
             continue
@@ -90,7 +90,7 @@ def get_node_density(shape, bin_x, bin_y, xdata, ydata) -> np.ndarray:
 def feature_grid2node(grid_feature: np.ndarray, bin_x, bin_y, xdata, ydata) -> np.ndarray:
     return np.array([
         grid_feature[int(x / bin_x), int(y / bin_y)] for x, y in zip(xdata, ydata)
-    ], dtype=np.float)
+    ], dtype=np.float64)
 
 
 def load_data(dir_name: str, given_iter, index: int, hashcode: str,
@@ -167,7 +167,7 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
     n_dim = homo_graph.ndata['feat'].shape[1]
     us4, vs4 = [], []
     off_temps = [5678, 7654, 8888, 10035]
-    node_pos_code = np.zeros([n_node, n_dim], dtype=np.float)
+    node_pos_code = np.zeros([n_node, n_dim], dtype=np.float64)
     for off_idx, (x_offset, y_offset) in enumerate([(0, 0), (win_x / 2, 0), (0, win_y / 2), (win_x / 2, win_y / 2)]):
         box_node = {}
         iter_sp = tqdm.tqdm(enumerate(zip(sizdata_x, sizdata_y, xdata, ydata)), total=n_node) \
@@ -188,12 +188,12 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
             node_pos_code[i, 0::2] += np.sin(
                 np.array([
                     pos_idx / (off_temps[off_idx] ** (di / n_dim)) for di in list(range(n_dim))[0::2]
-                ], dtype=np.float)
+                ], dtype=np.float64)
             )
             node_pos_code[i, 1::2] += np.cos(
                 np.array([
                     pos_idx / (off_temps[off_idx] ** ((di - 1) / n_dim)) for di in list(range(n_dim))[1::2]
-                ], dtype=np.float)
+                ], dtype=np.float64)
             )
         #             print(pos_idx)
         #             print(node_pos_code[i])
