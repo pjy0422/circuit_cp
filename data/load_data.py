@@ -6,7 +6,7 @@ import dgl
 import dgl.function as fn
 import tqdm
 
-from dgl.transform import add_self_loop, metis_partition
+from dgl.transforms import add_self_loop, metis_partition
 from typing import Tuple, List, Dict
 
 
