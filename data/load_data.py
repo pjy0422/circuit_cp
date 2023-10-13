@@ -72,7 +72,8 @@ def get_pin_density(shape, bin_x, bin_y, xdata, ydata, edge) -> np.ndarray:
             px, py = xdata[node], ydata[node]
             if not px and not py:
                 continue
-            pin_density[int((px + pin_px) / bin_x), int((py + pin_py) / bin_y)] += 1
+            pin_density[int((px + pin_px) / bin_x),
+                        int((py + pin_py) / bin_y)] += 1
     return pin_density
 
 
@@ -111,18 +112,23 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
     xdata = np.load(f'{dir_name}/xdata_{given_iter}.npy')
     ydata = np.load(f'{dir_name}/ydata_{given_iter}.npy')
     raw_dir_name = dir_name[:-10]
-    h_net_density_grid = np.load(f'{raw_dir_name}/iter_{given_iter}_bad_cmap_h.npy')
-    v_net_density_grid = np.load(f'{raw_dir_name}/iter_{given_iter}_bad_cmap_v.npy')
+    h_net_density_grid = np.load(
+        f'{raw_dir_name}/iter_{given_iter}_bad_cmap_h.npy')
+    v_net_density_grid = np.load(
+        f'{raw_dir_name}/iter_{given_iter}_bad_cmap_v.npy')
     if os.path.exists(f'{raw_dir_name}/iter_{given_iter}_net2hpwl.npy'):
         net2hpwl = np.load(f'{raw_dir_name}/iter_{given_iter}_net2hpwl.npy')
         net2hpwl[net2hpwl < 1e-4] = 1e-4
         net2hpwl = np.log10(net2hpwl)
     else:
         net2hpwl = None
-    pin_density_grid = get_pin_density(h_net_density_grid.shape, bin_x, bin_y, xdata, ydata, edge)
-    node_density_grid = get_node_density(h_net_density_grid.shape, bin_x, bin_y, xdata, ydata)
+    pin_density_grid = get_pin_density(
+        h_net_density_grid.shape, bin_x, bin_y, xdata, ydata, edge)
+    node_density_grid = get_node_density(
+        h_net_density_grid.shape, bin_x, bin_y, xdata, ydata)
 
-    labels = np.load(f'{dir_name}/iter_{given_iter}_node_label_full_{hashcode}_.npy')
+    labels = np.load(
+        f'{dir_name}/iter_{given_iter}_node_label_full_{hashcode}_.npy')
     labels = labels[:, index]
     n_node = labels.shape[0]
 
@@ -152,11 +158,15 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
     homo_graph.ndata.pop('addnlfeat')
     homo_graph.ndata.pop('wts')
     homo_graph.ndata.pop('wtmsg')
-    homo_graph.ndata['feat'] = torch.cat([homo_graph.ndata['feat'], extra], dim=1)
-    homo_graph.ndata['label'] = torch.tensor(labels[:n_node], dtype=torch.float32)
-    partition_list = get_partition_list(homo_graph, int(np.ceil(n_node / graph_scale)))
+    homo_graph.ndata['feat'] = torch.cat(
+        [homo_graph.ndata['feat'], extra], dim=1)
+    homo_graph.ndata['label'] = torch.tensor(
+        labels[:n_node], dtype=torch.float32)
+    partition_list = get_partition_list(
+        homo_graph, int(np.ceil(n_node / graph_scale)))
     # partition_list = get_partition_list_random(homo_graph, int(np.ceil(n_node / graph_scale)))
-    list_homo_graph = [dgl.node_subgraph(homo_graph, partition) for partition in partition_list]
+    list_homo_graph = [dgl.node_subgraph(
+        homo_graph, partition) for partition in partition_list]
     print('\thomo_graph generated')
 
     def distance_among(a: int, b: int) -> float:
@@ -184,7 +194,8 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
             for x in range(x_1, x_2 + 1):
                 for y in range(y_1, y_2 + 1):
                     box_node.setdefault(f'{x}-{y}', []).append(i)
-            pos_idx = 20 * (((px + sx * 0.5) / win_x) % 1.0) + 5 * (((py + sy * 0.5) / win_y) % 1.0)
+            pos_idx = 20 * (((px + sx * 0.5) / win_x) % 1.0) + \
+                5 * (((py + sy * 0.5) / win_y) % 1.0)
             node_pos_code[i, 0::2] += np.sin(
                 np.array([
                     pos_idx / (off_temps[off_idx] ** (di / n_dim)) for di in list(range(n_dim))[0::2]
@@ -240,32 +251,43 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
             min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
             span_h = max_x - min_x + 1
             span_v = max_y - min_y + 1
-            min_px, max_px, min_py, max_py = min(pxs), max(pxs), min(pys), max(pys)
+            min_px, max_px, min_py, max_py = min(
+                pxs), max(pxs), min(pys), max(pys)
             span_ph = max_px - min_px + 1
             span_pv = max_py - min_py + 1
-        net_span_feat.append([span_v, span_h, span_v * span_h, span_pv, span_ph, span_pv * span_ph, n_pin])
+        net_span_feat.append(
+            [span_v, span_h, span_v * span_h, span_pv, span_ph, span_pv * span_ph, n_pin])
     net_degree = np.array(net_degree)
-    net_degree_ = torch.unsqueeze(torch.tensor(net_degree, dtype=torch.float32), dim=-1)
+    net_degree_ = torch.unsqueeze(torch.tensor(
+        net_degree, dtype=torch.float32), dim=-1)
     net_span_feat_ = torch.tensor(net_span_feat, dtype=torch.float32)
-    net_label = torch.unsqueeze(torch.tensor(net_label, dtype=torch.float32), dim=-1)
+    net_label = torch.unsqueeze(torch.tensor(
+        net_label, dtype=torch.float32), dim=-1)
     net_hv = torch.cat([net_degree_, net_span_feat_], dim=-1)
 
-    hetero_graph = dgl.heterograph({
-        ('node', 'near', 'node'): (us4, vs4),
-        ('node', 'pins', 'net'): (us, vs),
-        ('net', 'pinned', 'node'): (vs, us),
-    }, num_nodes_dict={'node': n_node, 'net': len(net_degree)})
+    hetero_graph = dgl.heterograph(
+        {
+            ('node', 'near', 'node'): (us4, vs4),
+            ('node', 'pins', 'net'): (us, vs),
+            ('net', 'pinned', 'node'): (vs, us),
+        },
+        num_nodes_dict={'node': n_node, 'net': len(net_degree)}
+    )
     hetero_graph.nodes['node'].data['hv'] = homo_graph.ndata['feat']
-    hetero_graph.nodes['node'].data['pos_code'] = torch.tensor(node_pos_code, dtype=torch.float32)
+    hetero_graph.nodes['node'].data['pos_code'] = torch.tensor(
+        node_pos_code, dtype=torch.float32)
     hetero_graph.nodes['net'].data['hv'] = net_hv
     hetero_graph.nodes['net'].data['degree'] = net_degree_
     hetero_graph.nodes['net'].data['label'] = net_label
     # hetero_graph.edges['pins'].data['he'] = torch.tensor(he, dtype=torch.float32)
-    hetero_graph.edges['pinned'].data['he'] = torch.tensor(he, dtype=torch.float32)
-    hetero_graph.edges['near'].data['he'] = torch.tensor(dis4, dtype=torch.float32)
+    hetero_graph.edges['pinned'].data['he'] = torch.tensor(
+        he, dtype=torch.float32)
+    hetero_graph.edges['near'].data['he'] = torch.tensor(
+        dis4, dtype=torch.float32)
 
     list_hetero_graph = []
-    iter_partition_list = tqdm.tqdm(partition_list, total=len(partition_list)) if use_tqdm else partition_list
+    iter_partition_list = tqdm.tqdm(partition_list, total=len(
+        partition_list)) if use_tqdm else partition_list
     for partition in iter_partition_list:
         partition_set = set(partition)
         new_net_degree_dict = {}
@@ -278,7 +300,8 @@ def load_data(dir_name: str, given_iter, index: int, hashcode: str,
         good_nets = np.abs(net_degree[keep_nets_id] - keep_nets_degree) < 1e-5
 #         print(np.sum(good_nets), len(good_nets))
         keep_nets_id = keep_nets_id[good_nets]
-        part_hetero_graph = dgl.node_subgraph(hetero_graph, nodes={'node': partition, 'net': keep_nets_id})
+        part_hetero_graph = dgl.node_subgraph(
+            hetero_graph, nodes={'node': partition, 'net': keep_nets_id})
 #         new_net_degree = torch.unsqueeze(torch.tensor(list(new_net_degree_dict.values()), dtype=torch.float32), dim=-1)
 #         part_hetero_graph.nodes['net'].data['new_degree'] = new_net_degree
 #         print(part_hetero_graph.nodes['net'].data['degree'])

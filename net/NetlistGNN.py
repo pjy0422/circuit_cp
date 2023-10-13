@@ -24,7 +24,7 @@ class NodeNetGNN(nn.Module):
 
 #         def geom_edge_func(efeat):
 #             return self.geom_lin(efeat)
-        
+
         def my_agg_func(tensors, dsttype):
             new_tensors = []
             for tensor in tensors:
@@ -38,16 +38,17 @@ class NodeNetGNN(nn.Module):
         self.hetero_conv = HeteroGraphConv({
             'pins': GraphConv(in_feats=hidden_node_feats, out_feats=out_net_feats),
             'pinned':
-#                 NNConv(in_feats=hidden_net_feats, out_feats=out_node_feats, edge_func=topo_edge_func)
-#                 SAGEConv(in_feats=(hidden_net_feats, hidden_node_feats), out_feats=out_node_feats, aggregator_type='pool')
+            #                 NNConv(in_feats=hidden_net_feats, out_feats=out_node_feats, edge_func=topo_edge_func)
+            #                 SAGEConv(in_feats=(hidden_net_feats, hidden_node_feats), out_feats=out_node_feats, aggregator_type='pool')
                 CFConv(node_in_feats=hidden_net_feats, edge_in_feats=hidden_pin_feats,
                        hidden_feats=hidden_node_feats, out_feats=out_node_feats)
             if use_topo_edge else GraphConv(in_feats=hidden_net_feats, out_feats=out_node_feats),
             'near':
-#                 NNConv(in_feats=hidden_node_feats, out_feats=out_node_feats, edge_func=geom_edge_func)
-                SAGEConv(in_feats=hidden_node_feats, out_feats=out_node_feats, aggregator_type='pool')
-#                 CFConv(node_in_feats=hidden_node_feats, edge_in_feats=hidden_edge_feats,
-#                        hidden_feats=hidden_node_feats, out_feats=out_node_feats)
+            #                 NNConv(in_feats=hidden_node_feats, out_feats=out_node_feats, edge_func=geom_edge_func)
+                SAGEConv(in_feats=hidden_node_feats,
+                         out_feats=out_node_feats, aggregator_type='pool')
+            #                 CFConv(node_in_feats=hidden_node_feats, edge_in_feats=hidden_edge_feats,
+            #                        hidden_feats=hidden_node_feats, out_feats=out_node_feats)
             if use_geom_edge else GATConv(in_feats=hidden_node_feats, out_feats=out_node_feats, num_heads=1),
         }, aggregate=my_agg_func)
 
@@ -61,12 +62,13 @@ class NodeNetGNN(nn.Module):
 
         mod_kwargs = {}
         if self.use_topo_edge:
-#             mod_kwargs['pinned'] = {'efeat': pin_feat}
-#             mod_kwargs['pinned'] = {'edge_weight': torch.sigmoid(self.topo_weight(pin_feat))}
+            #             mod_kwargs['pinned'] = {'efeat': pin_feat}
+            #             mod_kwargs['pinned'] = {'edge_weight': torch.sigmoid(self.topo_weight(pin_feat))}
             mod_kwargs['pinned'] = {'edge_feats': pin_feat}
         if self.use_geom_edge:
-#             mod_kwargs['near'] = {'efeat': edge_feat}
-            mod_kwargs['near'] = {'edge_weight': torch.sigmoid(self.geom_weight(edge_feat))}
+            #             mod_kwargs['near'] = {'efeat': edge_feat}
+            mod_kwargs['near'] = {'edge_weight': torch.sigmoid(
+                self.geom_weight(edge_feat))}
 #             mod_kwargs['near'] = {'edge_feats': edge_feat}
 
         h1 = self.hetero_conv.forward(g, h, mod_kwargs=mod_kwargs)
@@ -109,11 +111,15 @@ class NetlistGNN(nn.Module):
                             self.hidden_pin_feats, self.hidden_edge_feats,
                             self.out_node_feats, self.out_net_feats, use_topo_edge, use_geom_edge) for _ in range(self.n_layer)])
         self.n_target = n_target
-        self.output_layer_1 = nn.Linear(self.in_node_feats + self.hidden_node_feats, self.hidden_node_feats)
-        self.output_layer_2 = nn.Linear(self.hidden_node_feats, self.hidden_node_feats)
+        self.output_layer_1 = nn.Linear(
+            self.in_node_feats + self.hidden_node_feats, self.hidden_node_feats)
+        self.output_layer_2 = nn.Linear(
+            self.hidden_node_feats, self.hidden_node_feats)
         self.output_layer_3 = nn.Linear(self.hidden_node_feats, self.n_target)
-        self.output_layer_net_1 = nn.Linear(self.in_net_feats + self.hidden_net_feats, self.hidden_net_feats)
-        self.output_layer_net_2 = nn.Linear(self.hidden_net_feats, self.hidden_net_feats)
+        self.output_layer_net_1 = nn.Linear(
+            self.in_net_feats + self.hidden_net_feats, self.hidden_net_feats)
+        self.output_layer_net_2 = nn.Linear(
+            self.hidden_net_feats, self.hidden_net_feats)
         self.output_layer_net_3 = nn.Linear(self.hidden_net_feats, 1)
         self.output_layer_net_x1 = nn.Linear(self.in_net_feats, 64)
         self.output_layer_net_x2 = nn.Linear(64, 64)
@@ -138,19 +144,24 @@ class NetlistGNN(nn.Module):
             else:
                 node_feat, net_feat = self.list_node_net_gnn[i].forward(
                     node_net_graph, node_feat, net_feat, pin_feat, edge_feat)
-            node_feat, net_feat = F.leaky_relu(node_feat), F.leaky_relu(net_feat)
+            node_feat, net_feat = F.leaky_relu(
+                node_feat), F.leaky_relu(net_feat)
 
         output_predictions = self.output_layer_3(F.leaky_relu(
             self.output_layer_2(F.leaky_relu(
-                self.output_layer_1(torch.cat([in_node_feat, node_feat], dim=-1))
+                self.output_layer_1(
+                    torch.cat([in_node_feat, node_feat], dim=-1))
             ))
         ))
-        net_feat1 = net_feat0 + F.relu(self.output_layer_net_1(torch.cat([in_net_feat, net_feat], dim=-1)))
+        net_feat1 = net_feat0 + \
+            F.relu(self.output_layer_net_1(
+                torch.cat([in_net_feat, net_feat], dim=-1)))
         net_feat2 = net_feat1 + F.relu(self.output_layer_net_2(net_feat1))
         net_feat3 = self.output_layer_net_3(net_feat2)
         net_feat_x1 = self.output_layer_net_x1(in_net_feat)
         net_feat_x2 = self.output_layer_net_x2(F.relu(net_feat_x1))
-        output_net_predictions = self.output_layer_net_x3(F.relu(net_feat_x2)) + F.tanh(net_feat3)
+        output_net_predictions = self.output_layer_net_x3(
+            F.relu(net_feat_x2)) + F.tanh(net_feat3)
         if self.activation == 'sig':
             output_predictions = torch.sigmoid(output_predictions)
 #             output_net_predictions = torch.sigmoid(output_net_predictions)

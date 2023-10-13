@@ -91,9 +91,11 @@ train_list_tuple_graph, validate_list_tuple_graph, test_list_tuple_graph = [], [
 
 def fit_topo_geom(ltg):
     if args.topo_geom == 'topo':
-        ltg = [(g, dgl.remove_edges(hg, hg.edges('eid', etype='near'), etype='near')) for g, hg in ltg]
+        ltg = [(g, dgl.remove_edges(hg, hg.edges(
+            'eid', etype='near'), etype='near')) for g, hg in ltg]
     elif args.topo_geom == 'geom':
-        ltg = [(g, dgl.remove_edges(hg, hg.edges('eid', etype='pinned'), etype='pinned')) for g, hg in ltg]
+        ltg = [(g, dgl.remove_edges(hg, hg.edges(
+            'eid', etype='pinned'), etype='pinned')) for g, hg in ltg]
     ltg = [(g, dgl.add_self_loop(hg, etype='near')) for g, hg in ltg]
     return ltg
 
@@ -133,8 +135,10 @@ for dataset_name in [test_dataset_name]:
                                          win_x=args.win_x, win_y=args.win_y, win_cap=args.win_cap)
             list_tuple_graph = fit_topo_geom(list_tuple_graph)
             test_list_tuple_graph.extend(list_tuple_graph)
-n_train_node = sum(map(lambda x: x[0].number_of_nodes(), train_list_tuple_graph))
-n_validate_node = sum(map(lambda x: x[0].number_of_nodes(), validate_list_tuple_graph))
+n_train_node = sum(
+    map(lambda x: x[0].number_of_nodes(), train_list_tuple_graph))
+n_validate_node = sum(
+    map(lambda x: x[0].number_of_nodes(), validate_list_tuple_graph))
 n_test_node = sum(map(lambda x: x[0].number_of_nodes(), test_list_tuple_graph))
 
 print('##### MODEL #####')
@@ -170,8 +174,10 @@ elif args.beta > 7.0:
 else:
     print(f'### USE SmoothL1Loss with beta={args.beta} ###')
     loss_f = nn.SmoothL1Loss(beta=args.beta)
-optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1, gamma=(1 - args.lr_decay))
+optimizer = torch.optim.Adam(
+    model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+scheduler = torch.optim.lr_scheduler.StepLR(
+    optimizer, 1, gamma=(1 - args.lr_decay))
 
 LOG_DIR = f'log/{args.test}'
 if not os.path.isdir(LOG_DIR):
@@ -187,9 +193,9 @@ def to_device(a, b):
 
 for epoch in range(0, args.epochs + 1):
     print(f'##### EPOCH {epoch} #####')
-    print(f'\tLearning rate: {optimizer.state_dict()["param_groups"][0]["lr"]}')
+    print(
+        f'\tLearning rate: {optimizer.state_dict()["param_groups"][0]["lr"]}')
     logs.append({'epoch': epoch})
-
 
     def train(ltg):
         model.train()
@@ -202,7 +208,8 @@ for epoch in range(0, args.epochs + 1):
             in_node_feat = hetero_graph.nodes['node'].data['hv']
             in_net_feat = hetero_graph.nodes['net'].data['hv']
             if args.pos_code > 1e-5 and args.topo_geom != 'topo':
-                in_node_feat += args.pos_code * hetero_graph.nodes['node'].data['pos_code']
+                in_node_feat += args.pos_code * \
+                    hetero_graph.nodes['node'].data['pos_code']
             if args.topo_geom == 'topo':
                 in_node_feat = in_node_feat[:, [0, 1, 2, 7, 8, 9]]
                 in_net_feat = in_net_feat[:, [0]]
@@ -218,7 +225,8 @@ for epoch in range(0, args.epochs + 1):
             weight = 1 / hetero_graph.nodes['node'].data['hv'][:, 6]
             weight[torch.isinf(weight)] = 0.0
             if args.topo_geom != 'topo':
-                loss = torch.sum(((pred.view(-1) - batch_labels.float()) ** 2) * weight) / torch.sum(weight)
+                loss = torch.sum(
+                    ((pred.view(-1) - batch_labels.float()) ** 2) * weight) / torch.sum(weight)
             else:
                 loss = loss_f(pred.view(-1), batch_labels.float())
             losses.append(loss)
@@ -228,7 +236,6 @@ for epoch in range(0, args.epochs + 1):
                 losses.clear()
         scheduler.step()
         print(f"\tTraining time per epoch: {time() - t1}")
-
 
     def evaluate(ltg, set_name, n_node, single_net=False):
         model.eval()
@@ -242,7 +249,8 @@ for epoch in range(0, args.epochs + 1):
                 in_node_feat = hetero_graph.nodes['node'].data['hv']
                 in_net_feat = hetero_graph.nodes['net'].data['hv']
                 if args.pos_code > 1e-5 and args.topo_geom != 'topo':
-                    in_node_feat += args.pos_code * hetero_graph.nodes['node'].data['pos_code']
+                    in_node_feat += args.pos_code * \
+                        hetero_graph.nodes['node'].data['pos_code']
                 if args.topo_geom == 'topo':
                     in_node_feat = in_node_feat[:, [0, 1, 2, 7, 8, 9]]
                     in_net_feat = in_net_feat[:, [0]]
@@ -265,7 +273,8 @@ for epoch in range(0, args.epochs + 1):
                     tgt, prd, output_pos, density
                 p += ln
         outputdata = outputdata[:p, :]
-        d = printout(outputdata[:, 0], outputdata[:, 1], "\t\tNODE_LEVEL: ", f'{set_name}node_level_')
+        d = printout(outputdata[:, 0], outputdata[:, 1],
+                     "\t\tNODE_LEVEL: ", f'{set_name}node_level_')
         logs[-1].update(d)
         if single_net:
             if set_name == 'test_' and args.test == 'superblue19':
@@ -273,12 +282,13 @@ for epoch in range(0, args.epochs + 1):
                                      args.binx, args.biny, [321, 518],
                                      f'{args.name}-{set_name}', epoch=epoch, fig_dir=FIG_DIR)
             d1, d2 = get_grid_level_corr(outputdata[:, :4], args.binx, args.biny,
-                                         int(np.rint(np.max(outputdata[:, 2]) / args.binx)) + 1,
-                                         int(np.rint(np.max(outputdata[:, 3]) / args.biny)) + 1,
+                                         int(np.rint(
+                                             np.max(outputdata[:, 2]) / args.binx)) + 1,
+                                         int(np.rint(
+                                             np.max(outputdata[:, 3]) / args.biny)) + 1,
                                          set_name=set_name)
             logs[-1].update(d1)
             logs[-1].update(d2)
-
 
     t0 = time()
     if epoch:
@@ -287,7 +297,8 @@ for epoch in range(0, args.epochs + 1):
     logs[-1].update({'train_time': time() - t0})
     t2 = time()
     evaluate(train_list_tuple_graph, 'train_', n_train_node)
-    evaluate(validate_list_tuple_graph, 'validate_', n_validate_node, single_net=True)
+    evaluate(validate_list_tuple_graph, 'validate_',
+             n_validate_node, single_net=True)
     evaluate(test_list_tuple_graph, 'test_', n_test_node, single_net=True)
     print("\tinference time", time() - t2)
     logs[-1].update({'eval_time': time() - t2})
