@@ -1,27 +1,27 @@
+"""
+This script loads data from the specified dataset and trains a NetlistGNN model on it.
+The model is trained using the specified hyperparameters and the training logs are stored.
+"""
+
+import wandb
 import json
 import os
 import argparse
 from time import time
 from typing import List, Dict, Any
 from functools import reduce
-
 import numpy as np
 import dgl
-
 import torch
 import torch.nn as nn
-
 from data.load_data import load_data
 from net.NetlistGNN import NetlistGNN
 from log.store_cong import store_cong_from_node
 from utils.output import printout, get_grid_level_corr
-
 import warnings
-
 warnings.filterwarnings("ignore")
 np.set_printoptions(precision=3, suppress=True)
 logs: List[Dict[str, Any]] = []
-
 argparser = argparse.ArgumentParser("Training")
 
 argparser.add_argument('--name', type=str, default='main')
@@ -62,7 +62,8 @@ argparser.add_argument('--biny', type=int, default=40)
 
 argparser.add_argument('--graph_scale', type=int, default=10000)
 args = argparser.parse_args()
-
+wandb.init(project='superblue')
+wandb.config.update(args)
 seed = args.seed
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -135,6 +136,7 @@ for dataset_name in [test_dataset_name]:
                                          win_x=args.win_x, win_y=args.win_y, win_cap=args.win_cap)
             list_tuple_graph = fit_topo_geom(list_tuple_graph)
             test_list_tuple_graph.extend(list_tuple_graph)
+
 n_train_node = sum(
     map(lambda x: x[0].number_of_nodes(), train_list_tuple_graph))
 n_validate_node = sum(
@@ -159,6 +161,7 @@ model = NetlistGNN(
     recurrent=args.recurrent,
     use_topo_edge=args.use_topo_edge, use_geom_edge=args.use_geom_edge
 ).to(device)
+wandb.watch(model)
 n_param = 0
 for name, param in model.named_parameters():
     print(f'\t{name}: {param.shape}')
@@ -196,8 +199,10 @@ for epoch in range(0, args.epochs + 1):
     print(
         f'\tLearning rate: {optimizer.state_dict()["param_groups"][0]["lr"]}')
     logs.append({'epoch': epoch})
+    wandb.log({'learning rate': optimizer.state_dict()
+               ["param_groups"][0]["lr"]})
 
-    def train(ltg):
+    def train(tr_epoch, ltg):
         model.train()
         t1 = time()
         losses = []
@@ -230,11 +235,14 @@ for epoch in range(0, args.epochs + 1):
             else:
                 loss = loss_f(pred.view(-1), batch_labels.float())
             losses.append(loss)
+            if (len(losses) == args.batch and tr_epoch == args.train_epoch - 1):
+                wandb.log({'epoch': epoch, 'train_loss': sum(losses)})
             if len(losses) >= args.batch or j == n_tuples - 1:
                 sum(losses).backward()
                 optimizer.step()
                 losses.clear()
         scheduler.step()
+
         print(f"\tTraining time per epoch: {time() - t1}")
 
     def evaluate(ltg, set_name, n_node, single_net=False):
@@ -242,6 +250,7 @@ for epoch in range(0, args.epochs + 1):
         print(f'\tEvaluate {set_name}:')
         outputdata = np.zeros((n_node, 5))
         p = 0
+        loss = 0
         with torch.no_grad():
             for j, (homo_graph, hetero_graph) in enumerate(ltg):
                 homo_graph, hetero_graph = to_device(homo_graph, hetero_graph)
@@ -268,6 +277,7 @@ for epoch in range(0, args.epochs + 1):
                 output_predictions = prd
                 tgt = output_labels.cpu().data.numpy().flatten()
                 prd = output_predictions.cpu().data.numpy().flatten()
+
                 ln = len(tgt)
                 outputdata[p:p + ln, 0], outputdata[p:p + ln, 1], outputdata[p:p + ln, 2:4], outputdata[p:p + ln, 4] = \
                     tgt, prd, output_pos, density
@@ -275,6 +285,7 @@ for epoch in range(0, args.epochs + 1):
         outputdata = outputdata[:p, :]
         d = printout(outputdata[:, 0], outputdata[:, 1],
                      "\t\tNODE_LEVEL: ", f'{set_name}node_level_')
+        wandb.log(d)
         logs[-1].update(d)
         if single_net:
             if set_name == 'test_' and args.test == 'superblue19':
@@ -287,13 +298,16 @@ for epoch in range(0, args.epochs + 1):
                                          int(np.rint(
                                              np.max(outputdata[:, 3]) / args.biny)) + 1,
                                          set_name=set_name)
+            wandb.log(d1)
+            wandb.log(d2)
             logs[-1].update(d1)
             logs[-1].update(d2)
 
     t0 = time()
     if epoch:
-        for _ in range(args.train_epoch):
-            train(train_list_tuple_graph)
+        for tr_epoch in range(args.train_epoch):
+            train(tr_epoch, train_list_tuple_graph)
+    wandb.log({'train_time': time() - t0})
     logs[-1].update({'train_time': time() - t0})
     t2 = time()
     evaluate(train_list_tuple_graph, 'train_', n_train_node)
@@ -301,6 +315,7 @@ for epoch in range(0, args.epochs + 1):
              n_validate_node, single_net=True)
     evaluate(test_list_tuple_graph, 'test_', n_test_node, single_net=True)
     print("\tinference time", time() - t2)
+    wandb.log({'inference_time': time() - t2})
     logs[-1].update({'eval_time': time() - t2})
     with open(f'{LOG_DIR}/{args.name}.json', 'w+') as fp:
         json.dump(logs, fp)
